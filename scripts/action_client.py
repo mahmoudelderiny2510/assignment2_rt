@@ -1,86 +1,73 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import rospy
 import actionlib
-from assignment_2_2024.msg import PlanningAction, PlanningGoal  # Replace with your action name
+from assignment2_rt.msg import PlanningAction, PlanningGoal
 from nav_msgs.msg import Odometry
-from custom_msgs.msg import PositionVelocity  # Replace with your custom message
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Point
+from std_msgs.msg import String
 
 # Global variables
-robot_position = None
-robot_velocity = None
+robot_position = Point()
 
 
 def odom_callback(data):
-    global robot_position, robot_velocity
-
-    # Extract position
+    """Callback function to update the robot's position."""
+    global robot_position
     robot_position = data.pose.pose.position
 
-    # Extract velocity
-    robot_velocity = data.twist.twist
+
+def send_goal(client, x, y):
+    """Send a goal to the action server."""
+    goal = PlanningGoal()
+    goal.target_pose.pose.position.x = x
+    goal.target_pose.pose.position.y = y
+    client.send_goal(goal)
+    rospy.loginfo(f"Goal sent: x={x}, y={y}")
 
 
-def publish_position_velocity(pub):
-    global robot_position, robot_velocity
-
-    if robot_position and robot_velocity:
-        msg = PositionVelocity()
-        msg.x = robot_position.x
-        msg.y = robot_position.y
-        msg.vel_x = robot_velocity.linear.x
-        msg.vel_z = robot_velocity.angular.z
-        pub.publish(msg)
+def cancel_goal(client):
+    """Cancel the current goal."""
+    client.cancel_goal()
+    rospy.loginfo("Goal cancelled.")
 
 
 def main():
     rospy.init_node('action_client_node')
 
-    # Create action client
+    # Action client setup
     client = actionlib.SimpleActionClient('/reaching_goal', PlanningAction)
     rospy.loginfo("Waiting for action server...")
     client.wait_for_server()
-    rospy.loginfo("Action server available.")
+    rospy.loginfo("Action server is ready.")
 
-    # Set up publisher for robot position and velocity
-    position_velocity_pub = rospy.Publisher('/robot_position_velocity', PositionVelocity, queue_size=10)
-
-    # Subscribe to /odom topic for robot's position and velocity
+    # Subscriber to /odom
     rospy.Subscriber('/odom', Odometry, odom_callback)
 
-    # Rate for publishing data
+    # Publisher for custom feedback (if required by the repo structure)
+    feedback_pub = rospy.Publisher('/reaching_goal/feedback', String, queue_size=10)
+
     rate = rospy.Rate(10)
 
     while not rospy.is_shutdown():
-        # Prompt user for input
         user_input = input("Enter target (x, y) or 'cancel': ")
 
         if user_input.lower() == 'cancel':
-            rospy.loginfo("Cancelling the goal...")
-            client.cancel_goal()
+            cancel_goal(client)
         else:
             try:
-                # Parse user input
                 x, y = map(float, user_input.split(','))
-                rospy.loginfo(f"Sending goal: x={x}, y={y}")
+                send_goal(client, x, y)
 
-                # Create and send goal
-                goal = PlanningGoal()
-                goal.target_pose.pose.position.x = x
-                goal.target_pose.pose.position.y = y
-                client.send_goal(goal)
-
-                # Monitor progress
+                # Monitor the goal's progress
                 while not client.wait_for_result(timeout=rospy.Duration(1.0)):
-                    rospy.loginfo("Waiting for the goal to be reached...")
-                
+                    feedback_msg = f"Current position: x={robot_position.x:.2f}, y={robot_position.y:.2f}"
+                    rospy.loginfo(feedback_msg)
+                    feedback_pub.publish(feedback_msg)
+
                 rospy.loginfo("Goal reached!")
             except ValueError:
-                rospy.logerr("Invalid input. Enter x, y coordinates or 'cancel'.")
-
-        # Publish position and velocity
-        publish_position_velocity(position_velocity_pub)
+                rospy.logerr("Invalid input. Please enter valid x, y coordinates or 'cancel'.")
 
         rate.sleep()
 
