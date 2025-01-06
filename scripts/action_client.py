@@ -6,9 +6,12 @@ from assignment2_rt.msg import PlanningAction, PlanningGoal
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point
 from std_msgs.msg import String
+from assignment2_rt.srv import LastTarget, LastTargetResponse
+
 
 # Global variables
 robot_position = Point()
+last_target = Point()  # Store the last target provided by the user
 
 
 def odom_callback(data):
@@ -19,6 +22,9 @@ def odom_callback(data):
 
 def send_goal(client, x, y):
     """Send a goal to the action server."""
+    global last_target
+    last_target.x = x  # Update last target
+    last_target.y = y
     goal = PlanningGoal()
     goal.target_pose.pose.position.x = x
     goal.target_pose.pose.position.y = y
@@ -30,6 +36,12 @@ def cancel_goal(client):
     """Cancel the current goal."""
     client.cancel_goal()
     rospy.loginfo("Goal cancelled.")
+
+
+def handle_get_last_target(req):
+    """Service callback to return the last target."""
+    rospy.loginfo(f"Returning last target: x={last_target.x}, y={last_target.y}")
+    return LastTargetResponse(x=last_target.x, y=last_target.y)
 
 
 def main():
@@ -44,8 +56,12 @@ def main():
     # Subscriber to /odom
     rospy.Subscriber('/odom', Odometry, odom_callback)
 
-    # Publisher for custom feedback (if required by the repo structure)
+    # Publisher for custom feedback (optional)
     feedback_pub = rospy.Publisher('/reaching_goal/feedback', String, queue_size=10)
+
+    # Advertise the service to provide the last target
+    rospy.Service('get_last_target', LastTarget, handle_get_last_target)
+    rospy.loginfo("Service 'get_last_target' is ready.")
 
     rate = rospy.Rate(10)
 
@@ -72,7 +88,7 @@ def main():
         rate.sleep()
 
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     try:
         main()
     except rospy.ROSInterruptException:
