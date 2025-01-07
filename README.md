@@ -10,7 +10,7 @@ The primary problem addressed is the blocking nature of the robot task while rea
 - Developing three nodes:
   - An action client node to interact with the action server.
   - A service node to return the last target's coordinates.
-  - A node for managing robot position and velocity.
+ 
 - Creating a launch file to start the simulation.
 
 ## Implementation
@@ -27,9 +27,6 @@ The primary problem addressed is the blocking nature of the robot task while rea
 
 - Provides a service to return the coordinates of the last target set by the user.
 
-#### Custom Message Publisher Node
-
-- Handles publishing robot position and velocity based on `/odom` topic updates.
 
 ### Launch File
 
@@ -63,10 +60,6 @@ roslaunch assignment2_rt simulation.launch
  - Call the service node to get the last target coordinates.
  - Monitor robot position and velocity updates.
    
-## Features
- - Non-blocking task execution with an action server.
- - Real-time feedback on target status.
- - Robot state publishing with custom messages.
 
 
 
